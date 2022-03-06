@@ -1,0 +1,13 @@
+# depslib dependency file v1.0
+1612697619 source:c:\users\flugi\cb\grafkit64\main.cpp
+	"graphics.hpp"
+
+1612611542 c:\users\flugi\cb\grafkit64\include\graphics.hpp
+	<string>
+
+1612698440 source:c:\users\flugi\cb\graphicskit64\main.cpp
+	"graphics.hpp"
+
+1612611542 c:\users\flugi\cb\graphicskit64\include\graphics.hpp
+	<string>
+
