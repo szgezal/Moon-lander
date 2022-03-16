@@ -1,5 +1,5 @@
-#include <iostream>
 #include <graphics.hpp>
+#include <vector>
 #include <time.h>
 #include <math.h>
 using namespace genv;
@@ -38,8 +38,8 @@ struct Shuttle {
     Shuttle(int x_, int y_, Platform* target_): x(x_), y(y_), target(target_) {}
 
     void draw() {
-        gout << color(210, 210, 210) << move_to(x - 10, y - 10) << box(20, 20) << move_to(x - 10, y + 10)
-             << line_to(x - 15, y + 20) << move_to(x + 10, y + 10) << line_to(x + 15, y + 20);
+        gout << color(210, 210, 210) << move_to(x - 10, y[0] - 10) << box(20, 20) << move_to(x - 10, y[0] + 10)
+             << line_to(x - 15, y[0] + 20) << move_to(x + 10, y[0] + 10) << line_to(x + 15, y[0] + 20);
     }
 
     void movex(double& hvel) {
@@ -52,9 +52,9 @@ struct Shuttle {
         }
 
         // platform interaction
-        if (y == height - 30 || (x > target->get_x() - target->get_size_x()/2 - 15 &&
+        if (y[0] == height - 30 || (x > target->get_x() - target->get_size_x()/2 - 15 &&
                                  x < target->get_x() + target->get_size_x()/2 + 15 &&
-                                 y == target->get_y() - 20)) {
+                                 y[0] == target->get_y() - 20)) {
                 hvel = 0;
         }
 
@@ -65,16 +65,25 @@ struct Shuttle {
 
         double dy = (gravity * accel * fabs(accel));
 
-        if (y <= height - 30 && y >= 10)
-            y += dy;
+        // storing y coordinates between "jumps"
+        int n = std::floor(fabs(dy));
+        if (n == 0)
+            n = 1;
+        y = std::vector<int> (n + 1, y[0]);
+        for (size_t i = 1; i < y.size(); i++) {
+            y[i] += i;
+        }
 
-        if (y > height - 30) {
-            y = height - 30;
+        if (y[0] <= height - 30 && y[0] >= 10)
+            y[0] += dy;
+
+        if (y[0] > height - 30) {
+            y[0] = height - 30;
             accel = -1;
         }
 
-        if (y < 10) {
-            y = 10;
+        if (y[0] < 10) {
+            y[0] = 10;
             accel = 20;
         }
 
@@ -82,42 +91,42 @@ struct Shuttle {
             // above the platform
             if (x > target->get_x() - target->get_size_x()/2 - 15 &&
                 x < target->get_x() + target->get_size_x()/2 + 15 &&
-                y < target->get_y() + 5 && y > target->get_y() - 20) {
-
-                y = target->get_y() - 20;
-                accel = 0;
-            }
+                y[0] < target->get_y() + 5 && y[0] > target->get_y() - 20)
+                    y[0] = target->get_y() - 20;
 
             // under the platform
             if (x > target->get_x() - target->get_size_x()/2 - 15 &&
                 x < target->get_x() + target->get_size_x()/2 + 15 &&
-                y < target->get_y() + 30 && y > target->get_y() - 15) {
+                y[0] < target->get_y() + 30 && y[0] > target->get_y() - 15) {
                     accel += 15;
 
             } else if (x > target->get_x() - target->get_size_x()/2 - 15 &&
                        x < target->get_x() + target->get_size_x()/2 + 15 &&
-                       y < target->get_y() + 15 && y > target->get_y() - 15) {
-                           y = target->get_y() + 15;
+                       y[0] < target->get_y() + 15 && y[0] > target->get_y() - 15) {
+                           y[0] = target->get_y() + 15;
                            accel = 20;
             }
     }
 
-    bool is_speed_high(double accel) {
-        if (x > target->get_x() - target->get_size_x()/2 - 20 &&
-            x < target->get_x() + target->get_size_x()/2 + 20 &&
-            y < target->get_y() + 10 && y > target->get_y() - 50)
-                return accel > 40;
+    bool speed_is_high(double accel) {
+        for (size_t i = 0; i < y.size(); i++) {
+            if (x > target->get_x() - target->get_size_x()/2 - 20 &&
+                x < target->get_x() + target->get_size_x()/2 + 20 &&
+                y[i] == target->get_y() - 20)
+                    return accel > 40;
+        }
     }
 
     bool is_landed() {
         if (x > target->get_x() - target->get_size_x()/2 - 15 &&
             x < target->get_x() + target->get_size_x()/2 + 15 &&
-            y < target->get_y() + 5 && y > target->get_y() - 21)
+            y[0] == target->get_y() - 20)
                 return true;
     }
 
 private:
-    int x, y;
+    int x;
+    std::vector<int> y;
     Platform* target;
 };
 
@@ -188,36 +197,29 @@ bool gameloop(event ev) {
             accel = 100;
         }
 
-
         if (ev.type == ev_key){
             if (ev.keycode == 'w') {
                 accel -= (5.0);
-                shuttle.movey(accel);
             }
 
             if (ev.keycode == 'a') {
                 hvel -= 1.0;
-                shuttle.movex(hvel);
             }
 
             if (ev.keycode == 'd') {
                 hvel += 1.0;
-                shuttle.movex(hvel);
             }
 
             if (ev.keycode == key_escape)
                 exit(0);
         }
 
-        if (shuttle.is_speed_high(accel)) {
-            crashed = true;
-        }
-
         gout << refresh;
 
-        if (crashed)
+        if (shuttle.speed_is_high(accel)) {
+            crashed = true;
             return crashed;
-        else if (shuttle.is_landed() && !crashed)
+        } else if (shuttle.is_landed() && !crashed)
             return crashed;
     }
 }
