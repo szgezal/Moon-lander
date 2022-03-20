@@ -1,2 +1,0 @@
-# Moon-lander
-University assignment

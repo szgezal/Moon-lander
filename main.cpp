@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <fstream>
+#include <sstream>
 using namespace genv;
 
 const int width = 800, height = 800;
@@ -35,13 +36,12 @@ private:
 
 
 struct Shuttle {
-
     Shuttle(int x_, int y_, Platform* target_): x(x_), target(target_) {
         y[0] = y_;
     }
 
     void draw() {
-        gout << color(210, 210, 210) << move_to(x - 10, y[0] - 10) << box(20, 20) << move_to(x - 10, y[0] + 10)
+        gout << color(150, 150, 150) << move_to(x - 10, y[0] - 10) << box(20, 20) << move_to(x - 10, y[0] + 10) << color(255, 255, 0)
              << line_to(x - 15, y[0] + 20) << move_to(x + 10, y[0] + 10) << line_to(x + 15, y[0] + 20);
         for (int i = 1; i <= 10; i++) {
             gout << move_to(x - 10 + i, y[0] - 10 - i) << line(20 - 2*i, 0);
@@ -49,10 +49,10 @@ struct Shuttle {
     }
 
     void movex(double& hvel) {
-        if (x > width - 20) {
+        if (x > width - 20 || x + hvel > width - 20) {
             x = width - 20;
             hvel = 0;
-        } else if (x < 20) {
+        } else if (x < 20 || x + hvel < 20) {
             x = 20;
             hvel = 0;
         }
@@ -68,7 +68,6 @@ struct Shuttle {
     }
 
     void movey(double& accel) {
-
         double dy = (gravity * accel * fabs(accel));
 
         // storing y coordinates between "jumps"
@@ -158,8 +157,8 @@ void textpos(canvas& c, std::string s, int y, int size, int offset) {
     c << color(255, 255, 255) << move_to(x, y) << text(s);
 }
 
-std::vector<std::vector<Rgb>> background() {
-    std::ifstream f("background.kep");
+std::vector<std::vector<Rgb>> background(std::string img_name) {
+    std::ifstream f(img_name);
 
     int wid, hei;
     f >> hei >> wid;
@@ -172,23 +171,14 @@ std::vector<std::vector<Rgb>> background() {
         }
     }
 
-    return img;
+    f.close();
 
-//    generating background (gout.save -> .bmp -> .kep with konv)
-//        double r = 1000, x = 400, y = 1600, rgbvalue;
-//        for (int i = x - r; i < x + r; i++) {
-//            for (int j = y - r; j < y + r; j++) {
-//                if ((x - i) * (x - i) + (y - j) * (y - j) <= r * r) {
-//                    rgbvalue = 255 - ((x - i) * (x - i) + (y - j) * (y - j)) / (r * r) * 200;
-//                    gout << move_to(i, j) << color(rgbvalue, rgbvalue, rgbvalue) << dot;
-//                }
-//            }
-//        }
+    return img;
 }
 
 
 // Phase 1
-std::vector<std::vector<Rgb>> menu(event ev) {
+void menu(event ev, std::vector<std::vector<Rgb>> img) {
     canvas c;
     std::string s;
     c.open(800, 800);
@@ -197,9 +187,10 @@ std::vector<std::vector<Rgb>> menu(event ev) {
     textpos(c, "PLAY", 320, 30, 0);
     textpos(c, "Help: - Use \"W\", \"A\" and \"D\" to move", 499, 16, -34);
     textpos(c, "- Don't use your mouse or any other keys while moving", 519, 16, 76);
-    textpos(c, "- You can start the game by pressing ENTER", 539, 16, 32);
-    textpos(c, "or clicking the play button", 559, 16, -18);
-    textpos(c, "- Exit with the Esc key", 579, 16, -44);
+    textpos(c, "- Try to keep your vertical velocity below 40", 539, 16, 44);
+    textpos(c, "- You can start the game by pressing ENTER", 559, 16, 32);
+    textpos(c, "or clicking the play button", 579, 16, -18);
+    textpos(c, "- Exit with the Esc key", 599, 16, -44);
 
     // borders for the "PLAY" button
     c << move_to(width/2-51, height/2-88)
@@ -219,15 +210,13 @@ std::vector<std::vector<Rgb>> menu(event ev) {
              ev.button == btn_left) || ev.keycode == key_enter) {
             gout << color(0, 0, 0) << move_to(0, 0) << box(width, height) << refresh;
 
-            std::vector<std::vector<Rgb>> img = background();
-
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
                     gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
                 }
             }
 
-            return img;;
+            break;
 
         } else if (ev.type == ev_key)
             if (ev.keycode == key_escape)
@@ -237,6 +226,10 @@ std::vector<std::vector<Rgb>> menu(event ev) {
 
 // Phase 2
 bool gameloop(event ev, std::vector<std::vector<Rgb>> img) {
+    canvas c;
+    std::string s;
+    c.open(800, 800);
+
     double accel = -10, hvel = 0;
     bool crashed = false;
 
@@ -244,6 +237,21 @@ bool gameloop(event ev, std::vector<std::vector<Rgb>> img) {
     Shuttle shuttle(rand() % (width - 200) + 100, rand() % (height - 500) + 50, &platform);
 
     while (gin >> ev) {
+
+        for (int y = 0; y < 30; y++) {
+            for (int x = 0; x < 300; x++) {
+                gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
+            }
+        }
+
+        std::stringstream ss;
+        ss << "Vertical velocity: " << accel;
+        if (accel <= 40) {
+            gout << color(0, 255, 0) << move_to(10, 20) << text(ss.str());
+        } else {
+            gout << color(255, 0, 0) << move_to(10, 20) << text(ss.str());
+        }
+
         for (int y = shuttle.get_y() - 20; y <= shuttle.get_y() + 20; y++) {
             for (int x = shuttle.get_x() - 15; x <= shuttle.get_x() + 15; x++) {
                 gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
@@ -289,7 +297,10 @@ bool gameloop(event ev, std::vector<std::vector<Rgb>> img) {
 }
 
 //Phase 3
-void gameover(event ev, bool crashed) {
+std::vector<std::vector<Rgb>> gameover(event ev, std::vector<std::vector<Rgb>> img,
+                                                 std::vector<std::vector<Rgb>> img1,
+                                                 std::vector<std::vector<Rgb>> img2,
+                                                 std::vector<std::vector<Rgb>> img3, bool crashed) {
     canvas c;
     std::string s;
     c.open(800, 800);
@@ -298,56 +309,88 @@ void gameover(event ev, bool crashed) {
 
         textpos(c, "GAME OVER", 199, 50, -30);
         textpos(c, "TRY AGAIN", 407, 30, 0);
+        textpos(c, "?", 760, 30, 387);
 
-        // borders
-        c << move_to(width/2-91, height/2-1)
-          << line_to(width/2-91, height/2+49)
-          << line_to(height/2+99, height/2+49)
-          << line_to(height/2+99, height/2-1)
-          << line_to(width/2-91, height/2-1)
-          << refresh;
-
-        gout << stamp(c, 0, 0) << refresh;
-
-        while (gin >> ev) {
-            if ((ev.pos_x >= 350 &&
-                 ev.pos_x <= 450 &&
-                 ev.pos_y >= 400 &&
-                 ev.pos_y <= 450 &&
-                 ev.button == btn_left) || ev.keycode == key_enter) {
-                gout << color(0, 0, 0) << move_to(0, 0) << box(width, height) << refresh;
-                break;
-
-            } else if (ev.type == ev_key)
-                if (ev.keycode == key_escape)
-                    exit(0);
-        }
     } else {
+
         textpos(c, "SUCCESSFUL LANDING", 199, 50, -50);
         textpos(c, "PLAY AGAIN", 407, 30, 0);
+        textpos(c, "?", 760, 30, 387);
+    }
 
-        // borders
-        c << move_to(width/2-91, height/2-1)
-          << line_to(width/2-91, height/2+49)
-          << line_to(width/2+99, height/2+49)
-          << line_to(width/2+99, height/2-1)
-          << line_to(width/2-91, height/2-1)
-          << refresh;
+    // borders
+    c << move_to(width/2-91, height/2-1)
+      << line_to(width/2-91, height/2+49)
+      << line_to(height/2+99, height/2+49)
+      << line_to(height/2+99, height/2-1)
+      << line_to(width/2-91, height/2-1)
+      << move_to(width - 1, 750)
+      << line_to(width - 41, 750)
+      << line_to(width - 41, height - 1)
+      << refresh;
 
-        gout << stamp(c, 0, 0) << refresh;
+    gout << stamp(c, 0, 0) << refresh;
 
-        while (gin >> ev) {
-            if ((ev.pos_x >= width/2-91 &&
-                 ev.pos_x <= width/2+99 &&
-                 ev.pos_y >= height/2-1 &&
-                 ev.pos_y <= height/2+49 &&
-                 ev.button == btn_left) || ev.keycode == key_enter) {
+    while (gin >> ev) {
+        if ((ev.pos_x >= 350 &&
+            ev.pos_x <= 450 &&
+            ev.pos_y >= 400 &&
+            ev.pos_y <= 450 &&
+            ev.button == btn_left) || ev.keycode == key_enter) {
                 gout << color(0, 0, 0) << move_to(0, 0) << box(width, height) << refresh;
-                break;
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
+                    }
+                }
+                return img;
 
-            } else if (ev.type == ev_key)
-                if (ev.keycode == key_escape)
-                    exit(0);
+        } else if (ev.type == ev_key)
+            if (ev.keycode == key_escape)
+                exit(0);
+
+        // background selection screen
+        if (ev.pos_x >= width - 41 &&
+            ev.pos_x <= width - 1 &&
+            ev.pos_y >= 750 &&
+            ev.pos_y <= height - 1 &&
+            ev.button == btn_left) {
+                c << color(0, 0, 0) << move_to(0, 0) << box(width, height);
+                textpos(c, "Press \"1\", \"2\" or \"3\"", 400, 30, 40);
+                gout << stamp(c, 0, 0) << refresh;
+
+                while (gin >> ev) {
+                    if (ev.keycode == '1') {
+                        gout << color(0, 0, 0) << move_to(0, 0) << box(width, height) << refresh;
+                        for (int y = 0; y < height; y++) {
+                            for (int x = 0; x < width; x++) {
+                                gout << move_to(x, y) << color(img1[x][y].r, img1[x][y].g, img1[x][y].b) << dot;
+                            }
+                        }
+                        return img1;
+                    }
+                    else if (ev.keycode == '2') {
+                        gout << color(0, 0, 0) << move_to(0, 0) << box(width, height) << refresh;
+                        for (int y = 0; y < height; y++) {
+                            for (int x = 0; x < width; x++) {
+                                gout << move_to(x, y) << color(img2[x][y].r, img2[x][y].g, img2[x][y].b) << dot;
+                            }
+                        }
+                        return img2;
+                    }
+                    else if (ev.keycode == '3') {
+                        gout << color(0, 0, 0) << move_to(0, 0) << box(width, height) << refresh;
+                        for (int y = 0; y < height; y++) {
+                            for (int x = 0; x < width; x++) {
+                                gout << move_to(x, y) << color(img3[x][y].r, img3[x][y].g, img3[x][y].b) << dot;
+                            }
+                        }
+                        return img3;
+                    }
+                    else if (ev.type == ev_key)
+                        if (ev.keycode == key_escape)
+                            exit(0);
+                }
         }
     }
 }
@@ -363,8 +406,14 @@ int main()
     event ev;
     gin.timer(50);
 
+    std::vector<std::vector<Rgb>> img1 = background("background.kep");
+    std::vector<std::vector<Rgb>> img2 = background("moon.kep");
+    std::vector<std::vector<Rgb>> img3 = background("csirke.kep"); // :)
+    std::vector<std::vector<Rgb>> img = img1;
+    menu(ev, img1);
+
     while (ev.button != key_escape) {
-        gameover(ev, gameloop(ev, menu(ev)));
+        img = gameover(ev, img, img1, img2, img3, gameloop(ev, img));
     }
 
     return 0;
