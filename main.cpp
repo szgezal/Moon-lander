@@ -34,7 +34,6 @@ private:
     int x, y, size_x;
 };
 
-
 struct Shuttle {
     Shuttle(int x_, int y_, Platform* target_): x(x_), target(target_) {
         y[0] = y_;
@@ -176,7 +175,6 @@ std::vector<std::vector<Rgb>> background(std::string img_name) {
     return img;
 }
 
-
 // Phase 1
 void menu(event ev, std::vector<std::vector<Rgb>> img) {
     canvas c;
@@ -186,11 +184,10 @@ void menu(event ev, std::vector<std::vector<Rgb>> img) {
     textpos(c, "Moon-Lander", 99, 50, -5);
     textpos(c, "PLAY", 320, 30, 0);
     textpos(c, "Help: - Use \"W\", \"A\" and \"D\" to move", 499, 16, -34);
-    textpos(c, "- Don't use your mouse or any other keys while moving", 519, 16, 76);
-    textpos(c, "- Try to keep your vertical velocity below 40", 539, 16, 44);
-    textpos(c, "- You can start the game by pressing ENTER", 559, 16, 32);
-    textpos(c, "or clicking the play button", 579, 16, -18);
-    textpos(c, "- Exit with the Esc key", 599, 16, -44);
+    textpos(c, "- Try to keep your vertical velocity below 40", 519, 16, 44);
+    textpos(c, "- You can start the game by pressing ENTER", 539, 16, 32);
+    textpos(c, "or clicking the play button", 559, 16, -18);
+    textpos(c, "- Exit with the Esc key", 579, 16, -44);
 
     // borders for the "PLAY" button
     c << move_to(width/2-51, height/2-88)
@@ -226,6 +223,7 @@ void menu(event ev, std::vector<std::vector<Rgb>> img) {
 
 // Phase 2
 bool gameloop(event ev, std::vector<std::vector<Rgb>> img) {
+    gout.showmouse(false);
     canvas c;
     std::string s;
     c.open(800, 800);
@@ -237,62 +235,64 @@ bool gameloop(event ev, std::vector<std::vector<Rgb>> img) {
     Shuttle shuttle(rand() % (width - 200) + 100, rand() % (height - 500) + 50, &platform);
 
     while (gin >> ev) {
+        if (ev.type != ev_mouse) {
 
-        for (int y = 0; y < 30; y++) {
-            for (int x = 0; x < 300; x++) {
-                gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
-            }
-        }
-
-        std::stringstream ss;
-        ss << "Vertical velocity: " << accel;
-        if (accel <= 40) {
-            gout << color(0, 255, 0) << move_to(10, 20) << text(ss.str());
-        } else {
-            gout << color(255, 0, 0) << move_to(10, 20) << text(ss.str());
-        }
-
-        for (int y = shuttle.get_y() - 20; y <= shuttle.get_y() + 20; y++) {
-            for (int x = shuttle.get_x() - 15; x <= shuttle.get_x() + 15; x++) {
-                gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
-            }
-        }
-
-        shuttle.movey(accel);
-        shuttle.movex(hvel);
-        shuttle.draw();
-        platform.draw();
-
-        accel += (1.0);
-
-        if (accel >= 100) {
-            accel = 100;
-        }
-
-        if (ev.type == ev_key){
-            if (ev.keycode == 'w') {
-                accel -= (5.0);
+            for (int y = 0; y < 30; y++) {
+                for (int x = 0; x < 300; x++) {
+                    gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
+                }
             }
 
-            if (ev.keycode == 'a') {
-                hvel -= 1.0;
+            std::stringstream ss;
+            ss << "Vertical velocity: " << accel;
+            if (accel <= 40) {
+                gout << color(0, 255, 0) << move_to(10, 20) << text(ss.str());
+            } else {
+                gout << color(255, 0, 0) << move_to(10, 20) << text(ss.str());
             }
 
-            if (ev.keycode == 'd') {
-                hvel += 1.0;
+            for (int y = shuttle.get_y() - 20; y <= shuttle.get_y() + 20; y++) {
+                for (int x = shuttle.get_x() - 15; x <= shuttle.get_x() + 15; x++) {
+                    gout << move_to(x, y) << color(img[x][y].r, img[x][y].g, img[x][y].b) << dot;
+                }
             }
 
-            if (ev.keycode == key_escape)
-                exit(0);
+            shuttle.movey(accel);
+            shuttle.movex(hvel);
+            shuttle.draw();
+            platform.draw();
+
+            accel += (1.0);
+
+            if (accel >= 100) {
+                accel = 100;
+            }
+
+            if (ev.type == ev_key){
+                if (ev.keycode == 'w') {
+                    accel -= (5.0);
+                }
+
+                if (ev.keycode == 'a') {
+                    hvel -= 1.0;
+                }
+
+                if (ev.keycode == 'd') {
+                    hvel += 1.0;
+                }
+
+                if (ev.keycode == key_escape)
+                    exit(0);
+            }
+
+            gout << refresh;
+
+            if (shuttle.speed_is_high(accel)) {
+                crashed = true;
+                return crashed;
+            } else if (shuttle.is_landed() && !crashed)
+                return crashed;
         }
-
-        gout << refresh;
-
-        if (shuttle.speed_is_high(accel)) {
-            crashed = true;
-            return crashed;
-        } else if (shuttle.is_landed() && !crashed)
-            return crashed;
     }
 }
 
@@ -301,6 +301,7 @@ std::vector<std::vector<Rgb>> gameover(event ev, std::vector<std::vector<Rgb>> i
                                                  std::vector<std::vector<Rgb>> img1,
                                                  std::vector<std::vector<Rgb>> img2,
                                                  std::vector<std::vector<Rgb>> img3, bool crashed) {
+    gout.showmouse(true);
     canvas c;
     std::string s;
     c.open(800, 800);
@@ -394,7 +395,6 @@ std::vector<std::vector<Rgb>> gameover(event ev, std::vector<std::vector<Rgb>> i
         }
     }
 }
-
 
 int main()
 {
